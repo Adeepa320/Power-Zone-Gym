@@ -1,48 +1,58 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ClipboardList, RefreshCw } from 'lucide-react';
+import { ClipboardList, Printer, RefreshCw } from 'lucide-react';
 import { useFetch } from '@/hooks/useFetch';
 import { useAuth } from '@/hooks/useAuth';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Loader';
-import { ChartViewer } from '@/components/charts/ChartViewer';
+import { PlanViewer } from '@/components/workout/PlanViewer';
 import { DumbbellOutline, KettlebellOutline } from '@/components/landing/GymShapes';
 import { GYM } from '@/lib/constants';
-import type { UserDTO, WorkoutChartDTO } from '@/types';
+import type { WorkoutPlanDTO } from '@/types';
 
-export default function MyChartPage() {
+export default function MyWorkoutPlanPage() {
   const { user } = useAuth();
-  // Poll so admin edits/assignments show up without a manual refresh.
-  const { data, isLoading, isValidating, mutate } = useFetch<UserDTO>(user ? `/api/members/${user.id}` : null, {
+  // Poll so the trainer's edits show up without a manual refresh.
+  const { data: plan, isLoading, isValidating, mutate } = useFetch<WorkoutPlanDTO | null>(user ? `/api/workout-plans/${user.id}` : null, {
     refreshInterval: 30_000,
   });
 
-  const chart = data && typeof data.assignedChart === 'object' ? (data.assignedChart as WorkoutChartDTO | null) : null;
+  const trainerName = plan && typeof plan.updatedBy === 'object' ? plan.updatedBy?.name : undefined;
 
   return (
     <>
-      <PageHeader
-        title="My Workout Chart"
-        description="Your personalised program from your trainer."
-        breadcrumbs={[{ label: 'Dashboard', href: '/member' }, { label: 'My Workout Chart' }]}
-        actions={
-          <Button variant="ghost" size="sm" icon={<RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />} onClick={() => mutate()}>
-            Refresh
-          </Button>
-        }
-      />
+      <div className="print:hidden">
+        <PageHeader
+          title="My Workout Plan"
+          description="Your personal day-by-day routine from your trainer."
+          breadcrumbs={[{ label: 'Dashboard', href: '/member' }, { label: 'My Workout Plan' }]}
+          actions={
+            <>
+              {plan && (
+                <Button variant="secondary" size="sm" icon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>
+                  Print
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" icon={<RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />} onClick={() => mutate()}>
+                Refresh
+              </Button>
+            </>
+          }
+        />
+      </div>
 
-      {isLoading || !data ? (
+      {isLoading || plan === undefined ? (
         <div className="space-y-4">
-          <Skeleton className="h-48 rounded-2xl" />
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-2xl" />
+          <Skeleton className="h-40 rounded-2xl" />
+          <Skeleton className="h-14 rounded-xl" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 rounded-xl" />
           ))}
         </div>
-      ) : chart ? (
-        <ChartViewer chart={chart} />
+      ) : plan ? (
+        <PlanViewer plan={{ ...plan, trainerName, memberName: user?.name ?? undefined }} />
       ) : (
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass relative overflow-hidden rounded-3xl px-6 py-20 text-center">
           <div className="absolute inset-0 bg-grid-pattern bg-grid opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
@@ -60,10 +70,10 @@ export default function MyChartPage() {
             >
               <ClipboardList className="h-9 w-9" />
             </motion.div>
-            <h2 className="mt-6 text-2xl font-bold">No chart assigned yet</h2>
+            <h2 className="mt-6 text-2xl font-bold">Your plan is on its way</h2>
             <p className="mx-auto mt-3 max-w-md text-sm text-muted">
-              Your trainer at {GYM.name} will create a workout chart tailored to your goal
-              {data.fitnessGoal ? <> (<span className="text-white">{data.fitnessGoal.toLowerCase()}</span>)</> : null}. It will appear here automatically.
+              Your trainer at {GYM.name} will prepare a personal day-by-day routine for you. It will appear here automatically — no need to wait for a
+              WhatsApp message.
             </p>
           </div>
         </motion.div>

@@ -1,7 +1,8 @@
 /**
  * Seed script — creates the default admin and realistic sample data.
  *
- *   npm run seed            → admin + sample members, payments, attendance, charts
+ *   npm run seed            → admin + sample members, payments, attendance, workout plans
+ *                             (re-running adds plans to sample members that have none)
  *   npm run seed:admin      → admin account only
  *   npm run seed -- --reset → wipe ALL collections first, then seed everything
  *
@@ -19,9 +20,10 @@ config();
 import User from '../src/models/User';
 import Payment from '../src/models/Payment';
 import Attendance from '../src/models/Attendance';
-import WorkoutChart from '../src/models/WorkoutChart';
+import MemberWorkoutPlan from '../src/models/MemberWorkoutPlan';
+import { parseWhatsAppPlan } from '../src/lib/workoutPlan';
 import Settings from '../src/models/Settings';
-import { MEMBERSHIP_PRICING } from '../src/lib/constants';
+import { GYM, MEMBERSHIP_PRICING } from '../src/lib/constants';
 
 const args = new Set(process.argv.slice(2));
 const ADMIN_ONLY = args.has('--admin-only');
@@ -64,68 +66,113 @@ const SAMPLE_MEMBERS: {
   { name: 'Thilini Senanayake', gender: 'female', age: 28, weight: 59, height: 163, bodyType: 'Average', goal: 'Weight loss', category: 'normal', monthsAgo: 0, attendanceRate: 0.6 },
 ];
 
-const CHARTS = [
-  {
-    title: 'Beginner Chest Day',
-    category: 'chest',
-    description: 'Build a strong foundation for the chest and triceps. Warm up 10 minutes on the treadmill first.',
-    exercises: [
-      { name: 'Flat Barbell Bench Press', sets: 4, reps: '10-12', restTime: '90 sec', notes: 'Keep shoulder blades retracted, feet flat' },
-      { name: 'Incline Dumbbell Press', sets: 3, reps: '12', restTime: '75 sec', notes: '30° bench angle' },
-      { name: 'Pec Deck Fly', sets: 3, reps: '15', restTime: '60 sec' },
-      { name: 'Push-ups', sets: 3, reps: 'Till failure', restTime: '60 sec' },
-      { name: 'Cable Triceps Pushdown', sets: 3, reps: '12-15', restTime: '60 sec' },
-    ],
+/**
+ * Sample personal routines, written exactly the way trainers send them on WhatsApp
+ * and imported with the same parser the admin "Import from WhatsApp" button uses.
+ */
+const PLAN_TEMPLATES: Record<'muscle' | 'fatloss' | 'beginner', { title: string; notes: string; text: string }> = {
+  muscle: {
+    title: 'Muscle Gain Split – 4 Days',
+    notes: 'Rest 60–90s between sets. Increase weight when the last set feels easy. Eat 2g protein per kg bodyweight.',
+    text: `1 day - Chest & Biceps
+Incline flyes 12 10 8
+Incline press (m) 12 10 8
+Incline (D/b press 10 8 8)
+Bench press (m) 12 10 8
+Cable flyes 10-3
+Decline bench 8 10 12
+Z bar curl 10-2 8-2
+D/b curl 10 8 6
+Cable curl 8-4
+Hammer curl 10-2 8-2
+
+2 day - Shoulders & Traps
+B/b upright row 12 10 8
+D/b shrugs 12-2 10-2
+Bent over lateral 12-2 10-2
+Face pull 10-3
+D/b front raise 12-3
+Cable one arm front raise 10-3
+Back side lateral 12-3 (D/b side lateral 10-3)
+
+3 day - Back & Triceps
+Lat pulldown 12 10 8
+Seated cable row 12 10 8
+One arm D/b row 10-3
+Deadlift 8 6 6 (Keep back neutral)
+Triceps pushdown 12-3
+Overhead extension 10-3
+Dips till failure
+
+4 day - Legs & Core
+Squat 12 10 8 6
+Leg press 12-3
+Leg extension 15-3
+Leg curl 12-3
+Standing calf raise 20-4
+Hanging leg raise 15-3
+Plank 1 min-3`,
   },
-  {
-    title: 'Leg Day Power',
-    category: 'legs',
-    description: 'Compound-focused lower body session for strength and size.',
-    exercises: [
-      { name: 'Barbell Back Squat', sets: 5, reps: '5', restTime: '2 min', notes: 'Hit parallel depth, brace core' },
-      { name: 'Romanian Deadlift', sets: 4, reps: '8', restTime: '90 sec' },
-      { name: 'Leg Press', sets: 3, reps: '12', restTime: '90 sec' },
-      { name: 'Walking Lunges', sets: 3, reps: '12 each leg', restTime: '60 sec' },
-      { name: 'Seated Calf Raise', sets: 4, reps: '15-20', restTime: '45 sec' },
-    ],
+  fatloss: {
+    title: 'Weight Loss & Muscle Tone Schedule',
+    notes: 'Keep rest short (30–45s). Finish every session with 20 min cardio. Drink 3L water daily.',
+    text: `1 day - Upper Body
+Bench press (m) 15 12 10
+Lat pulldown 15 12 10
+D/b shoulder press 12-3
+Seated cable row 12-3
+Cable curl 15-3
+Triceps pushdown 15-3
+Treadmill incline walk 20 min
+
+2 day - Lower Body & Core
+Goblet squat 15-3
+Leg press 15 12 10
+Walking lunges 12-3 (each leg)
+Leg curl 15-3
+Crunches 20-3
+Russian twist 20-3
+Cycling 20 min
+
+3 day - Full Body Circuit
+Kettlebell swing 15-4
+Push-ups till failure
+D/b row 12-3
+Step ups 12-3
+Mountain climbers 30 sec-4
+Rowing machine 10 min`,
   },
-  {
-    title: 'Fat Burn Cardio Circuit',
-    category: 'cardio',
-    description: 'High-energy circuit to boost endurance and burn calories. Complete all rounds.',
-    exercises: [
-      { name: 'Treadmill Incline Walk', sets: 1, reps: '10 min', restTime: '—', notes: 'Incline 8-10%, speed 5 km/h' },
-      { name: 'Rowing Machine Sprint', sets: 5, reps: '250 m', restTime: '60 sec' },
-      { name: 'Battle Ropes', sets: 4, reps: '30 sec', restTime: '30 sec' },
-      { name: 'Jump Rope', sets: 4, reps: '1 min', restTime: '30 sec' },
-      { name: 'Stationary Bike Intervals', sets: 6, reps: '20 sec sprint', restTime: '40 sec easy' },
-    ],
+  beginner: {
+    title: 'Beginner Full Body – 3 Days',
+    notes: 'Focus on form before weight. Ask a trainer to check your squat and deadlift. Warm up 10 min.',
+    text: `1 day - Full Body A
+Squat (m) 12-3
+Bench press (m) 12-3
+Lat pulldown 12-3
+D/b shoulder press 10-3
+Plank 30 sec-3
+
+2 day - Full Body B
+Leg press 12-3
+Incline D/b press 12-3
+Seated cable row 12-3
+D/b lateral raise 12-3
+Crunches 15-3
+
+3 day - Full Body C
+Goblet squat 12-3
+Push-ups 10-3
+One arm D/b row 10-3
+Leg curl 12-3
+Treadmill 15 min`,
   },
-  {
-    title: 'Full Body Starter',
-    category: 'full_body',
-    description: 'Three days a week full-body routine for new members.',
-    exercises: [
-      { name: 'Goblet Squat', sets: 3, reps: '12', restTime: '60 sec' },
-      { name: 'Lat Pulldown', sets: 3, reps: '12', restTime: '60 sec' },
-      { name: 'Dumbbell Shoulder Press', sets: 3, reps: '10', restTime: '60 sec' },
-      { name: 'Seated Cable Row', sets: 3, reps: '12', restTime: '60 sec' },
-      { name: 'Plank', sets: 3, reps: '45 sec', restTime: '30 sec' },
-    ],
-  },
-  {
-    title: 'Back & Biceps Builder',
-    category: 'back',
-    description: 'Width and thickness for the back, finished with bicep isolation.',
-    exercises: [
-      { name: 'Deadlift', sets: 4, reps: '6', restTime: '2 min', notes: 'Neutral spine — film your form' },
-      { name: 'Pull-ups', sets: 4, reps: '8-10', restTime: '90 sec', notes: 'Use assisted machine if needed' },
-      { name: 'Bent-over Barbell Row', sets: 3, reps: '10', restTime: '75 sec' },
-      { name: 'Barbell Curl', sets: 3, reps: '12', restTime: '60 sec' },
-      { name: 'Hammer Curl', sets: 3, reps: '12', restTime: '60 sec' },
-    ],
-  },
-] as const;
+};
+
+function templateFor(goal: string, monthsAgo: number) {
+  if (goal === 'Weight loss' || goal === 'Endurance') return PLAN_TEMPLATES.fatloss;
+  if (monthsAgo <= 1 || goal === 'Flexibility & mobility' || goal === 'General fitness') return PLAN_TEMPLATES.beginner;
+  return PLAN_TEMPLATES.muscle;
+}
 
 async function seedAdmin() {
   const email = 'admin@gym.com';
@@ -171,12 +218,6 @@ async function seedSampleData(adminId: mongoose.Types.ObjectId) {
   const now = new Date();
   const today = startOfDay(now);
 
-  // Workout charts
-  const charts = await WorkoutChart.insertMany(
-    CHARTS.map((c) => ({ ...c, exercises: c.exercises.map((e) => ({ ...e })), createdBy: adminId, assignedTo: [] })),
-  );
-  console.log(`✔ Created ${charts.length} workout charts`);
-
   let paymentCount = 0;
   let attendanceCount = 0;
 
@@ -211,19 +252,6 @@ async function seedSampleData(adminId: mongoose.Types.ObjectId) {
             ]
           : [{ weight: m.weight, date: registered }],
     });
-
-    // Assign charts to most members
-    if (i % 4 !== 3) {
-      const chart =
-        m.category === 'cardio' || m.goal === 'Weight loss'
-          ? charts[2]
-          : m.monthsAgo <= 1
-            ? charts[3]
-            : charts[i % 2 === 0 ? 0 : 4];
-      await WorkoutChart.updateOne({ _id: chart._id }, { $addToSet: { assignedTo: user._id } });
-      user.assignedChart = chart._id;
-      await user.save();
-    }
 
     // Payments: one record per month since registration
     const payments = [];
@@ -281,6 +309,45 @@ async function seedSampleData(adminId: mongoose.Types.ObjectId) {
   console.log(`✔ Created ${attendanceCount} attendance records`);
 }
 
+/**
+ * Give every sample member (…@example.com) without a plan a personal routine.
+ * Real members are never touched.
+ */
+async function seedPlans(adminId: mongoose.Types.ObjectId) {
+  const members = await User.find({ role: 'member', email: /@example\.com$/ })
+    .select('name fitnessGoal registeredDate')
+    .sort({ createdAt: 1 })
+    .lean();
+  const existing = new Set((await MemberWorkoutPlan.find({ member: { $in: members.map((m) => m._id) } }).distinct('member')).map(String));
+  let created = 0;
+  for (const [i, m] of members.entries()) {
+    if (existing.has(m._id.toString())) continue;
+    if (i % 5 === 4) continue; // leave a few without a plan so "Need a plan" has examples
+    const monthsAgo = Math.max(0, Math.round((Date.now() - new Date(m.registeredDate).getTime()) / (30 * 86_400_000)));
+    const t = templateFor(m.fitnessGoal, monthsAgo);
+    await MemberWorkoutPlan.create({
+      member: m._id,
+      gymName: GYM.name,
+      planTitle: t.title,
+      startDate: m.registeredDate,
+      notes: t.notes,
+      days: parseWhatsAppPlan(t.text),
+      updatedBy: adminId,
+    });
+    created++;
+  }
+  console.log(`✔ Created ${created} personal workout plans`);
+}
+
+/** Remove data left over from the old generic chart library. */
+async function cleanupLegacyCharts() {
+  const db = mongoose.connection.db!;
+  const unset = await db.collection('users').updateMany({ assignedChart: { $exists: true } }, { $unset: { assignedChart: '' } });
+  const legacy = await db.listCollections({ name: 'workoutcharts' }).toArray();
+  if (legacy.length) await db.dropCollection('workoutcharts');
+  if (unset.modifiedCount || legacy.length) console.log('✔ Removed legacy workout chart templates');
+}
+
 async function main() {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
@@ -291,15 +358,19 @@ async function main() {
   console.log('✔ Connected to MongoDB');
 
   // Make sure indexes (incl. unique constraints) exist before inserting.
-  await Promise.all([User.syncIndexes(), Payment.syncIndexes(), Attendance.syncIndexes(), WorkoutChart.syncIndexes(), Settings.syncIndexes()]);
+  await Promise.all([User.syncIndexes(), Payment.syncIndexes(), Attendance.syncIndexes(), MemberWorkoutPlan.syncIndexes(), Settings.syncIndexes()]);
 
   if (RESET) {
-    await Promise.all([User.deleteMany({}), Payment.deleteMany({}), Attendance.deleteMany({}), WorkoutChart.deleteMany({}), Settings.deleteMany({})]);
+    await Promise.all([User.deleteMany({}), Payment.deleteMany({}), Attendance.deleteMany({}), MemberWorkoutPlan.deleteMany({}), Settings.deleteMany({})]);
     console.log('✔ Cleared all collections');
   }
 
   const admin = await seedAdmin();
-  if (!ADMIN_ONLY) await seedSampleData(admin._id);
+  await cleanupLegacyCharts();
+  if (!ADMIN_ONLY) {
+    await seedSampleData(admin._id);
+    await seedPlans(admin._id);
+  }
 
   await mongoose.disconnect();
   console.log('\n🏋️  Seed complete. Sign in at http://localhost:3000/login');

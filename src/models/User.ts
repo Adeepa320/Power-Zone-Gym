@@ -38,8 +38,6 @@ const userSchema = new Schema(
     registeredDate: { type: Date, default: Date.now },
     role: { type: String, enum: ['member', 'admin'], default: 'member' },
     isActive: { type: Boolean, default: true },
-
-    assignedChart: { type: Schema.Types.ObjectId, ref: 'WorkoutChart', default: null },
   },
   { timestamps: true },
 );

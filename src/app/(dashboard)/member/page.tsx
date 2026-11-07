@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { CheckInButton } from '@/components/dashboard/CheckInButton';
 import { PaymentStatusBadge } from '@/components/dashboard/PaymentStatusBadge';
-import { ChartCategoryBadge } from '@/components/charts/WorkoutChartCard';
+import { PlanPreview } from '@/components/workout/PlanPreview';
 import { MEMBERSHIP_CATEGORIES, MOTIVATIONAL_QUOTES } from '@/lib/constants';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import type { MemberStats } from '@/types';
@@ -111,56 +111,25 @@ export default function MemberDashboardPage() {
 
             <Card className="lg:col-span-3">
               <CardHeader
-                title="My Workout Chart"
+                title="My Workout Plan"
                 icon={<ClipboardList />}
                 action={
-                  data.assignedChart && (
+                  data.workoutPlan && (
                     <Link href="/member/my-chart" className="text-xs text-primary hover:underline">
-                      View full chart
+                      View full plan
                     </Link>
                   )
                 }
               />
-              {data.assignedChart ? (
-                <div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <ChartCategoryBadge category={data.assignedChart.category} />
-                    <span className="text-xs text-muted">Updated {formatDate(data.assignedChart.updatedAt)}</span>
-                  </div>
-                  <h3 className="mt-3 text-xl font-semibold">{data.assignedChart.title}</h3>
-                  <ul className="mt-4 space-y-2">
-                    {data.assignedChart.exercises.slice(0, 5).map((e, i) => (
-                      <motion.li
-                        key={e._id ?? i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 + i * 0.06 }}
-                        className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.03] px-4 py-2.5 text-sm"
-                      >
-                        <span className="flex items-center gap-3">
-                          <span className="font-mono text-xs text-primary">{String(i + 1).padStart(2, '0')}</span>
-                          {e.name}
-                        </span>
-                        <span className="text-xs text-muted">
-                          {e.sets} × {e.reps}
-                        </span>
-                      </motion.li>
-                    ))}
-                  </ul>
-                  {data.assignedChart.exercises.length > 5 && <p className="mt-2 text-xs text-muted">+{data.assignedChart.exercises.length - 5} more exercises</p>}
-                  <Link href="/member/my-chart" className="mt-5 inline-block">
-                    <Button variant="outline" size="sm" iconRight={<ArrowRight className="h-3.5 w-3.5" />}>
-                      Open my chart
-                    </Button>
-                  </Link>
-                </div>
+              {data.workoutPlan ? (
+                <PlanPreview plan={data.workoutPlan} />
               ) : (
                 <div className="flex flex-col items-center py-10 text-center">
                   <motion.div animate={{ rotate: [0, -10, 10, 0] }} transition={{ repeat: Infinity, duration: 3 }} className="rounded-2xl bg-white/5 p-4 text-muted">
                     <ClipboardList className="h-8 w-8" />
                   </motion.div>
-                  <p className="mt-4 font-medium">No chart assigned yet</p>
-                  <p className="mt-1 max-w-xs text-sm text-muted">Your trainer will assign a personalised workout chart soon. Ask at the front desk!</p>
+                  <p className="mt-4 font-medium">No workout plan yet</p>
+                  <p className="mt-1 max-w-xs text-sm text-muted">Your trainer will prepare your personal day-by-day routine soon. Ask at the front desk!</p>
                 </div>
               )}
             </Card>

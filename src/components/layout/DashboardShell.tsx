@@ -20,7 +20,7 @@ export function DashboardShell({ sidebar, children }: { sidebar: ReactNode; chil
     <div className="flex min-h-screen">
       {sidebar}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-white/5 bg-ink-950/70 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-20 flex print:hidden h-16 items-center justify-between gap-4 border-b border-white/5 bg-ink-950/70 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
               onClick={toggleSidebar}
@@ -32,7 +32,7 @@ export function DashboardShell({ sidebar, children }: { sidebar: ReactNode; chil
             <span className="lg:hidden">
               <Logo compact href={isAdmin ? '/admin' : '/member'} />
             </span>
-            <p className="hidden text-sm text-muted lg:block">{format(new Date(), 'EEEE, dd MMMM yyyy')}</p>
+            <p className="hidden text-sm text-muted lg:block" suppressHydrationWarning>{format(new Date(), 'EEEE, dd MMMM yyyy')}</p>
           </div>
           {user && (
             <div className="flex items-center gap-3">
@@ -46,7 +46,7 @@ export function DashboardShell({ sidebar, children }: { sidebar: ReactNode; chil
         </header>
         {/* Subtle grid background */}
         <main className="relative flex-1">
-          <div className="pointer-events-none absolute inset-0 bg-grid-pattern bg-grid opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent_60%)]" />
+          <div className="pointer-events-none absolute inset-0 print:hidden bg-grid-pattern bg-grid opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent_60%)]" />
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}

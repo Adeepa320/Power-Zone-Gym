@@ -7,6 +7,7 @@ import { categoryLabel, computeStreaks, currentMonthYear, formatCurrency, monthL
 import User from '@/models/User';
 import Payment from '@/models/Payment';
 import Attendance from '@/models/Attendance';
+import MemberWorkoutPlan from '@/models/MemberWorkoutPlan';
 import type { ActivityItem, AdminStats, MembershipCategory } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -126,19 +127,20 @@ async function adminStats(): Promise<AdminStats> {
 }
 
 async function memberStats(userId: string) {
-  const user = await User.findById(userId).populate('assignedChart').lean();
+  const user = await User.findById(userId).lean();
   if (!user) throw new ApiError('Member not found', 404);
 
   const { month, year } = currentMonthYear();
   if (user.isActive) await ensureMemberCurrentPayment(userId, user.membershipCategory);
 
   const monthStart = startOfMonth(new Date());
-  const [daysThisMonth, todayRecord, allDates, currentPayment, pricing] = await Promise.all([
+  const [daysThisMonth, todayRecord, allDates, currentPayment, pricing, workoutPlan] = await Promise.all([
     Attendance.countDocuments({ member: userId, date: { $gte: monthStart, $lte: endOfMonth(monthStart) } }),
     Attendance.findOne({ member: userId, date: startOfDay(new Date()) }).lean(),
     Attendance.find({ member: userId }).select('date').sort({ date: -1 }).limit(400).lean(),
     Payment.findOne({ member: userId, month, year }).lean(),
     getPricing(),
+    MemberWorkoutPlan.findOne({ member: userId }).lean(),
   ]);
 
   return {
@@ -151,6 +153,6 @@ async function memberStats(userId: string) {
     membershipCategory: user.membershipCategory,
     monthlyFee: currentPayment?.amount ?? pricing[user.membershipCategory],
     memberSince: user.registeredDate,
-    assignedChart: user.assignedChart ?? null,
+    workoutPlan: workoutPlan ?? null,
   };
 }

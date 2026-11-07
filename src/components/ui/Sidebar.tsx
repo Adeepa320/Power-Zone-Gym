@@ -133,7 +133,7 @@ export function Sidebar({ items, roleLabel }: { items: NavItem[]; roleLabel: str
       <motion.aside
         animate={{ width: sidebarCollapsed ? 76 : 260 }}
         transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-        className="glass-strong sticky top-0 z-30 hidden h-screen shrink-0 border-y-0 border-l-0 lg:block"
+        className="glass-strong sticky top-0 z-30 hidden h-screen shrink-0 border-y-0 border-l-0 lg:block print:!hidden"
       >
         {content(sidebarCollapsed, false)}
       </motion.aside>

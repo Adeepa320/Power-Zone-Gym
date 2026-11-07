@@ -8,7 +8,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: '/admin/members', label: 'Members', icon: Users },
   { href: '/admin/payments', label: 'Payments', icon: CreditCard },
   { href: '/admin/attendance', label: 'Attendance', icon: CalendarCheck },
-  { href: '/admin/charts', label: 'Workout Charts', icon: ClipboardList },
+  { href: '/admin/charts', label: 'Workout Plans', icon: ClipboardList },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 

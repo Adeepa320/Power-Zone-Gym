@@ -77,6 +77,18 @@
   }
 }
 
+/* Printing a workout plan: plain white page, no dashboard chrome */
+@media print {
+  body {
+    background: #fff !important;
+    background-image: none !important;
+    color: #000;
+  }
+  @page {
+    margin: 12mm;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

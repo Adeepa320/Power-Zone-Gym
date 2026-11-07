@@ -9,13 +9,13 @@ import { MAX_PROFILE_IMAGE_BYTES } from '@/lib/constants';
 import User from '@/models/User';
 import Payment from '@/models/Payment';
 import Attendance from '@/models/Attendance';
-import WorkoutChart from '@/models/WorkoutChart';
+import MemberWorkoutPlan from '@/models/MemberWorkoutPlan';
 
 export const dynamic = 'force-dynamic';
 
 type Ctx = { params: { id: string } };
 
-/** GET /api/members/:id — admin, or the member themself. Includes the assigned chart. */
+/** GET /api/members/:id — admin, or the member themself. */
 export async function GET(_req: Request, { params }: Ctx) {
   try {
     const session = await requireAuth();
@@ -23,9 +23,7 @@ export async function GET(_req: Request, { params }: Ctx) {
     assertSelfOrAdmin(session, id);
 
     await connectDB();
-    const user = await User.findById(id)
-      .populate({ path: 'assignedChart', populate: { path: 'createdBy', select: 'name' } })
-      .lean();
+    const user = await User.findById(id).lean();
     if (!user) throw new ApiError('Member not found', 404);
     return ok(user);
   } catch (error) {
@@ -93,7 +91,7 @@ export async function PUT(req: Request, { params }: Ctx) {
       await ensureMemberCurrentPayment(id, user.membershipCategory);
     }
 
-    const fresh = await User.findById(id).populate('assignedChart').lean();
+    const fresh = await User.findById(id).lean();
     return ok(fresh);
   } catch (error) {
     return handleError(error);
@@ -102,7 +100,7 @@ export async function PUT(req: Request, { params }: Ctx) {
 
 /**
  * DELETE /api/members/:id  (admin)
- * Permanently deletes the member with their payments & attendance.
+ * Permanently deletes the member with their payments, attendance & workout plan.
  * (Use PUT { isActive: false } to deactivate instead.)
  */
 export async function DELETE(_req: Request, { params }: Ctx) {
@@ -119,7 +117,7 @@ export async function DELETE(_req: Request, { params }: Ctx) {
     await Promise.all([
       Payment.deleteMany({ member: id }),
       Attendance.deleteMany({ member: id }),
-      WorkoutChart.updateMany({ assignedTo: id }, { $pull: { assignedTo: id } }),
+      MemberWorkoutPlan.deleteOne({ member: id }),
       user.deleteOne(),
     ]);
     return ok({ deleted: true });

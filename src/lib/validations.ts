@@ -14,17 +14,6 @@ export const phoneSchema = z
   .regex(/^\+?[0-9\s-]{9,15}$/, 'Enter a valid phone number');
 
 export const membershipCategorySchema = z.enum(['normal', 'cardio', 'personal_training']);
-export const chartCategorySchema = z.enum([
-  'chest',
-  'back',
-  'legs',
-  'shoulders',
-  'arms',
-  'abs',
-  'cardio',
-  'full_body',
-  'custom',
-]);
 
 // ---------- Registration (multi-step) ----------
 
@@ -135,30 +124,29 @@ export const checkoutSchema = z.object({
   paymentId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
 });
 
-// ---------- Workout charts ----------
+// ---------- Workout plans (per member) ----------
 
-export const exerciseSchema = z.object({
-  name: trimmed(2, 'Exercise name is required', 80),
-  sets: z.coerce.number({ invalid_type_error: 'Sets' }).int().min(1, 'Min 1').max(20, 'Max 20'),
-  reps: trimmed(1, 'Reps required', 30),
-  restTime: trimmed(1, 'Rest time required', 30),
-  notes: z.string().trim().max(300).optional().default(''),
-  imageUrl: imageDataUrl.optional(),
+export const planExerciseSchema = z.object({
+  name: trimmed(1, 'Exercise name is required', 120),
+  setsReps: z.string().trim().max(60, 'Too long').optional().default(''),
+  notes: z.string().trim().max(200).optional().default(''),
 });
 
-export const chartSchema = z.object({
-  title: trimmed(3, 'Title must be at least 3 characters', 100),
-  category: chartCategorySchema,
-  description: z.string().trim().max(500).optional().default(''),
-  exercises: z.array(exerciseSchema).min(1, 'Add at least one exercise').max(40),
-  chartImage: imageDataUrl.optional(),
+export const planDaySchema = z.object({
+  dayNumber: z.coerce.number().int().min(1).max(14),
+  dayTitle: z.string().trim().max(80).optional().default(''),
+  exercises: z.array(planExerciseSchema).min(1, 'Add at least one exercise to every day').max(40),
 });
-export type ChartInput = z.infer<typeof chartSchema>;
 
-export const assignChartSchema = z.object({
-  memberId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid member'),
-  chartId: z.string().regex(/^[a-f\d]{24}$/i, 'Select a chart').nullable(),
+export const workoutPlanSchema = z.object({
+  gymName: trimmed(2, 'Gym name is required', 80),
+  planTitle: trimmed(3, 'Plan title must be at least 3 characters', 120),
+  startDate: z.coerce.date({ invalid_type_error: 'Pick a start date' }),
+  notes: z.string().trim().max(1000).optional().default(''),
+  days: z.array(planDaySchema).min(1, 'Add at least one day').max(14, 'Maximum 14 days'),
 });
+export type WorkoutPlanInput = z.infer<typeof workoutPlanSchema>;
+export type WorkoutPlanFormInput = z.input<typeof workoutPlanSchema>;
 
 // ---------- Attendance ----------
 

@@ -1,4 +1,4 @@
-import type { ChartCategory, MembershipCategory, Pricing } from '@/types';
+import type { MembershipCategory, Pricing } from '@/types';
 
 export const GYM = {
   name: 'Power Zone Gym',
@@ -65,18 +65,6 @@ export const CATEGORY_LABELS: Record<MembershipCategory, string> = {
   personal_training: 'Personal Training',
 };
 
-export const CHART_CATEGORIES: { value: ChartCategory; label: string; color: string }[] = [
-  { value: 'chest', label: 'Chest', color: '#00d4ff' },
-  { value: 'back', label: 'Back', color: '#8b5cf6' },
-  { value: 'legs', label: 'Legs', color: '#00ff88' },
-  { value: 'shoulders', label: 'Shoulders', color: '#ffaa00' },
-  { value: 'arms', label: 'Arms', color: '#ff6b35' },
-  { value: 'abs', label: 'Abs', color: '#ff4fa3' },
-  { value: 'cardio', label: 'Cardio', color: '#ff4444' },
-  { value: 'full_body', label: 'Full Body', color: '#38bdf8' },
-  { value: 'custom', label: 'Custom', color: '#a0a0b0' },
-];
-
 export const BODY_TYPES = ['Slim', 'Average', 'Athletic', 'Muscular', 'Overweight'] as const;
 
 export const FITNESS_GOALS = [
@@ -116,6 +104,78 @@ export const MONTHS = [
 
 export const PAGE_SIZE = 10;
 
-/** Max upload sizes for data-URL images stored in MongoDB. */
-export const MAX_CHART_IMAGE_BYTES = 1.5 * 1024 * 1024;
+/** Max upload size for data-URL profile images stored in MongoDB. */
 export const MAX_PROFILE_IMAGE_BYTES = 300 * 1024;
+
+/** Autocomplete suggestions in the workout plan editor (trainers can type anything). */
+export const DAY_TITLE_SUGGESTIONS = [
+  'Chest & Biceps',
+  'Back & Triceps',
+  'Shoulders & Traps',
+  'Legs & Core',
+  'Back & Biceps',
+  'Chest & Triceps',
+  'Shoulders & Arms',
+  'Legs',
+  'Full Body',
+  'Cardio & Abs',
+  'Push',
+  'Pull',
+] as const;
+
+export const COMMON_EXERCISES = [
+  'Bench Press',
+  'Bench Press (Machine)',
+  'Incline Bench Press',
+  'Incline Dumbbell Press',
+  'Decline Bench Press',
+  'Incline Flyes',
+  'Cable Flyes',
+  'Pec Deck Fly',
+  'Cable Crossover',
+  'Push-ups',
+  'Dips',
+  'Pull-ups',
+  'Lat Pulldown',
+  'Seated Cable Row',
+  'Bent Over Row',
+  'One Arm Dumbbell Row',
+  'T-Bar Row',
+  'Deadlift',
+  'Romanian Deadlift',
+  'Barbell Upright Row',
+  'Dumbbell Shrugs',
+  'Face Pull',
+  'Overhead Press',
+  'Dumbbell Shoulder Press',
+  'Dumbbell Front Raise',
+  'Dumbbell Lateral Raise',
+  'Cable Lateral Raise',
+  'Rear Delt Fly',
+  'Barbell Curl',
+  'EZ Bar Curl',
+  'Dumbbell Curl',
+  'Hammer Curl',
+  'Cable Curl',
+  'Preacher Curl',
+  'Concentration Curl',
+  'Triceps Pushdown',
+  'Overhead Triceps Extension',
+  'Skull Crushers',
+  'Close Grip Bench Press',
+  'Squat',
+  'Leg Press',
+  'Hack Squat',
+  'Walking Lunges',
+  'Leg Extension',
+  'Leg Curl',
+  'Standing Calf Raise',
+  'Seated Calf Raise',
+  'Plank',
+  'Crunches',
+  'Hanging Leg Raise',
+  'Russian Twist',
+  'Treadmill',
+  'Cycling',
+  'Rowing Machine',
+] as const;

@@ -8,17 +8,6 @@ export type Gender = 'male' | 'female';
 export type MembershipCategory = 'normal' | 'cardio' | 'personal_training';
 export type PaymentMethod = 'online' | 'cash';
 export type PaymentStatus = 'paid' | 'pending' | 'overdue';
-export type ChartCategory =
-  | 'chest'
-  | 'back'
-  | 'legs'
-  | 'shoulders'
-  | 'arms'
-  | 'abs'
-  | 'cardio'
-  | 'full_body'
-  | 'custom';
-
 export type Pricing = Record<MembershipCategory, number>;
 
 /** Standard API envelope. */
@@ -29,27 +18,40 @@ export interface WeightEntry {
   date: string;
 }
 
-export interface Exercise {
+/** One exercise line, e.g. "Incline flies — 12 10 8". */
+export interface PlanExercise {
   _id?: string;
   name: string;
-  sets: number;
-  reps: string;
-  restTime: string;
+  /** Free-form: "12 10 8", "4 x 12", "10-3", "Till failure". */
+  setsReps: string;
   notes?: string;
-  imageUrl?: string;
 }
 
-export interface WorkoutChartDTO {
+export interface PlanDay {
+  _id?: string;
+  dayNumber: number;
+  dayTitle: string;
+  exercises: PlanExercise[];
+}
+
+/** A member's personalised multi-day routine (one per member). */
+export interface WorkoutPlanDTO {
   _id: string;
-  title: string;
-  category: ChartCategory;
-  description?: string;
-  exercises: Exercise[];
-  chartImage?: string;
-  createdBy?: { _id: string; name: string } | string;
-  assignedTo: (MemberSummary | string)[];
+  member: MemberSummary | string;
+  gymName: string;
+  planTitle: string;
+  startDate: string;
+  notes?: string;
+  days: PlanDay[];
+  updatedBy?: { _id: string; name: string } | string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Row in the admin workout-plans overview. */
+export interface MemberPlanListItem {
+  member: MemberSummary & { fitnessGoal?: string };
+  plan: { _id: string; planTitle: string; dayCount: number; exerciseCount: number; dayTitles: string[]; updatedAt: string } | null;
 }
 
 export interface MemberSummary {
@@ -80,7 +82,6 @@ export interface UserDTO {
   registeredDate: string;
   role: Role;
   isActive: boolean;
-  assignedChart?: WorkoutChartDTO | string | null;
   weightHistory: WeightEntry[];
   createdAt: string;
   updatedAt: string;
@@ -167,7 +168,7 @@ export interface MemberStats {
   membershipCategory: MembershipCategory;
   monthlyFee: number;
   memberSince: string;
-  assignedChart: WorkoutChartDTO | null;
+  workoutPlan: WorkoutPlanDTO | null;
 }
 
 export interface AttendanceOverview {

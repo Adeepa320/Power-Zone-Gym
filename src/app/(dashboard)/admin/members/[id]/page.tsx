@@ -40,11 +40,11 @@ import { AttendanceCalendar } from '@/components/dashboard/AttendanceCalendar';
 import { PaymentStatusBadge } from '@/components/dashboard/PaymentStatusBadge';
 import { CategoryBadge } from '@/components/dashboard/MemberTable';
 import { WeightChart } from '@/components/dashboard/WeightChart';
-import { ChartCategoryBadge } from '@/components/charts/WorkoutChartCard';
+import { dayColor } from '@/components/workout/PlanViewer';
 import { MemberEditForm } from '@/components/forms/MemberEditForm';
 import { PaymentForm } from '@/components/forms/PaymentForm';
 import { bmi, currentMonthYear, formatCurrency, formatDate, formatTime, monthLabel } from '@/lib/utils';
-import type { MemberAttendance, PaymentDTO, UserDTO, WorkoutChartDTO } from '@/types';
+import type { MemberAttendance, PaymentDTO, UserDTO, WorkoutPlanDTO } from '@/types';
 
 export default function MemberDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +57,7 @@ export default function MemberDetailPage() {
 
   const { data: member, error, isLoading, mutate } = useFetch<UserDTO>(`/api/members/${id}`);
   const { data: payments, mutate: mutatePayments } = useFetch<PaymentDTO[]>(`/api/payments?memberId=${id}`);
+  const { data: plan } = useFetch<WorkoutPlanDTO | null>(`/api/workout-plans/${id}`);
   const { data: attendance, mutate: mutateAttendance } = useFetch<MemberAttendance>(
     `/api/attendance/member/${id}?month=${period.month}&year=${period.year}`,
   );
@@ -73,7 +74,6 @@ export default function MemberDetailPage() {
     );
   }
 
-  const chart = typeof member.assignedChart === 'object' ? (member.assignedChart as WorkoutChartDTO | null) : null;
   const memberBmi = bmi(member.weight, member.height);
   const paidTotal = (payments ?? []).filter((p) => p.paymentStatus === 'paid').reduce((s, p) => s + p.amount, 0);
 
@@ -159,9 +159,9 @@ export default function MemberDetailPage() {
             <Button variant="secondary" size="sm" icon={<Pencil className="h-4 w-4" />} onClick={() => setEditOpen(true)}>
               Edit
             </Button>
-            <Link href={`/admin/charts/assign/${member._id}`}>
+            <Link href={`/admin/charts/${member._id}`}>
               <Button variant="secondary" size="sm" icon={<ClipboardList className="h-4 w-4" />}>
-                Assign chart
+                Workout plan
               </Button>
             </Link>
             <Button size="sm" variant="success" icon={<Banknote className="h-4 w-4" />} onClick={() => setCashOpen(true)}>
@@ -259,34 +259,41 @@ export default function MemberDetailPage() {
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader
-              title="Assigned Workout Chart"
+              title="Workout Plan"
+              description={plan ? `${plan.days.length} days · updated ${formatDate(plan.updatedAt)}` : 'Personal day-by-day routine'}
               icon={<ClipboardList />}
               action={
-                <Link href={`/admin/charts/assign/${member._id}`} className="text-xs text-primary hover:underline">
-                  {chart ? 'Change' : 'Assign'}
+                <Link href={`/admin/charts/${member._id}`} className="text-xs text-primary hover:underline">
+                  {plan ? 'Edit plan' : 'Create plan'}
                 </Link>
               }
             />
-            {chart ? (
-              <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:flex-row sm:items-center">
-                <div className="flex-1">
-                  <ChartCategoryBadge category={chart.category} />
-                  <p className="mt-2 font-semibold">{chart.title}</p>
-                  <p className="text-xs text-muted">
-                    {chart.exercises.length} exercises · updated {formatDate(chart.updatedAt)}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {chart.exercises.slice(0, 4).map((e, i) => (
-                    <span key={i} className="rounded-lg bg-white/5 px-2 py-1 text-xs text-muted">
-                      {e.name}
-                    </span>
+            {plan === undefined ? (
+              <div className="h-24 animate-pulse rounded-xl bg-white/[0.04]" />
+            ) : plan ? (
+              <div>
+                <p className="font-semibold">{plan.planTitle}</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {plan.days.map((d, i) => (
+                    <div key={d._id ?? i} className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                      <p className="text-xs font-bold" style={{ color: dayColor(i) }}>
+                        DAY {d.dayNumber}
+                        {d.dayTitle && <span className="ml-1.5 font-semibold text-white">{d.dayTitle}</span>}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs text-muted">{d.exercises.map((e) => e.name).join(' · ')}</p>
+                    </div>
                   ))}
-                  {chart.exercises.length > 4 && <span className="rounded-lg bg-white/5 px-2 py-1 text-xs text-muted">+{chart.exercises.length - 4}</span>}
                 </div>
               </div>
             ) : (
-              <p className="rounded-xl border border-dashed border-white/10 py-8 text-center text-sm text-muted">No chart assigned yet.</p>
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-white/10 py-8 text-center">
+                <p className="text-sm text-muted">No workout plan yet.</p>
+                <Link href={`/admin/charts/${member._id}`}>
+                  <Button size="sm" icon={<ClipboardList className="h-4 w-4" />}>
+                    Create plan
+                  </Button>
+                </Link>
+              </div>
             )}
           </Card>
 

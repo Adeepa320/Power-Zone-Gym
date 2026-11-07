@@ -1,6 +1,6 @@
 # 🏋️ Power Zone Gym — Gym Management App
 
-A full-stack gym management web application: member registration, role-based dashboards, monthly payments (Stripe + cash), attendance check-ins with streaks, and trainer-built workout charts.
+A full-stack gym management web application: member registration, role-based dashboards, monthly payments (Stripe + cash), attendance check-ins with streaks, and personal day-by-day workout plans for every member.
 
 **Stack:** Next.js 14 (App Router) · TypeScript · MongoDB/Mongoose · NextAuth (credentials, JWT) · Tailwind CSS · Framer Motion · Stripe · Zustand · React Hook Form + Zod · SWR · Recharts · date-fns · Lucide
 
@@ -73,16 +73,23 @@ Flow: **Pay Now** → `POST /api/payments` creates a Checkout Session → Stripe
 ### Admin (`/admin`)
 - **Dashboard:** animated stat counters, 6-month revenue chart (area/bar), activity feed, membership mix, quick actions.
 - **Members:** search, filter by category, payment status and active state, server-side sort and pagination, mobile card layout. Add members via the same 4-step form.
-- **Member detail:** profile, body details and weight trend, attendance calendar, payment history, assigned chart. Edit, change category, reset password, deactivate/reactivate, delete (with confirmation), mark cash payment, manual check-in.
+- **Member detail:** profile, body details and weight trend, attendance calendar, payment history, workout plan summary. Edit, change category, reset password, deactivate/reactivate, delete (with confirmation), mark cash payment, manual check-in.
 - **Payments:** month picker with a prominent collected total, collection rate, expected/pending/overdue totals, per-category breakdown, status tabs and category/method/search filters, "Mark cash" per row, "Generate dues".
 - **Attendance:** day view with date picker and manual check-in, average daily attendance, busiest day, heatmap calendar, most active members, member lookup.
-- **Workout charts:** library with category filters, dynamic exercise builder (add/remove/reorder), chart image upload for WhatsApp sharing, preview, edit, delete. An assignment page per member lets you pick or create a chart and assign or unassign it.
+- **Workout plans** (`/admin/charts`): every member gets their own plan; there is no shared template library.
+  - The overview lists every active member with plan status. "Need a plan" shows who still needs one.
+  - The editor (`/admin/charts/[memberId]`) has plan title, gym name, start date and trainer notes, then Day 1…N with a title (e.g. "Chest & Biceps") and exercise rows of name, free-form sets/reps (`12 10 8`, `10-3`, `4 x 12`, `Till failure`) and notes.
+  - Days can be added, duplicated, reordered and collapsed. Pressing Enter in the sets/reps or notes field jumps to the next row. Exercise names and day titles autocomplete.
+  - **Import from WhatsApp:** paste a routine exactly as sent on WhatsApp. "1 day" / "Day 2 - Legs" headings, sets and bracketed notes are detected, and WhatsApp copy prefixes like `[18:30, 06/11/2026] Sachin Gym:` are stripped.
+  - **Copy from another member** gives you a starting point to tweak.
+  - **Send on WhatsApp** opens a chat with the member, with the plan pre-formatted. You can also copy the text or print it.
+  - A live preview shows exactly what the member will see.
 - **Settings:** edit membership pricing, optionally re-pricing this month's pending dues.
 
 ### Member (`/member`)
-- **Dashboard:** greeting and daily motivational quote, stats, a large animated **Mark Attendance** button ("Already Checked In Today ✅"), chart preview, payment-due banner.
+- **Dashboard:** greeting and daily motivational quote, stats, a large animated **Mark Attendance** button ("Already Checked In Today ✅"), workout plan preview with day switcher, payment-due banner.
 - **Payments:** big PAID ✅ / PAYMENT DUE ⚠️ card, Stripe **Pay Now**, overdue alerts, full history.
-- **My Chart:** full chart view with exercises, sets, reps, rest and notes, plus the chart image with fullscreen and download. Polls every 30 s so trainer edits show up without a refresh. Animated empty state when nothing is assigned.
+- **My Workout Plan:** day tabs (or all days at once), each exercise with its sets/reps and notes, plus the trainer's notes. It has a print-friendly layout and checks for trainer edits every 30 s, so changes appear without a refresh. An animated empty state shows until a plan is created.
 - **Attendance:** streak counter, monthly calendar (attended days in green), check-in times, history by month.
 - **Profile:** contact and body details (weight changes are logged and charted), profile photo upload, membership info.
 
@@ -114,9 +121,10 @@ All endpoints return `{ success: true, data }` or `{ success: false, error }` wi
 | GET | `/api/attendance` | admin | Day list + monthly stats (heatmap, top members, average) |
 | POST | `/api/attendance` | member / admin | Check in (one per day, enforced by unique index) |
 | GET | `/api/attendance/member/:id` | admin or self | History, streaks, totals |
-| GET/POST | `/api/charts` | admin (members: own) | List / create charts |
-| GET/PUT/DELETE | `/api/charts/:id` | admin (GET: assigned member) | Chart CRUD |
-| POST | `/api/charts/assign` | admin | Assign or unassign a chart for a member |
+| GET | `/api/workout-plans` | admin | Active members with plan summary (search, category, status=with/without) |
+| GET | `/api/workout-plans/:memberId` | admin or self | The member's plan (or `null`) |
+| PUT | `/api/workout-plans/:memberId` | admin | Create or replace the member's plan |
+| DELETE | `/api/workout-plans/:memberId` | admin | Delete the member's plan |
 | GET | `/api/dashboard/stats` | admin / member | Role-specific dashboard data |
 | GET/PUT | `/api/settings` | public / admin | Membership pricing |
 
@@ -138,12 +146,13 @@ src/
 │   │                # PageHeader/Breadcrumbs, MonthPicker, SuccessBurst/Confetti
 │   ├── layout/      # Navbar, AdminSidebar, MemberSidebar, DashboardShell, Footer, Logo
 │   ├── landing/     # Hero sections, SVG gym shapes, Typewriter, Reveal
-│   ├── forms/       # RegisterForm, LoginForm, PaymentForm, ChartForm, MemberEditForm
+│   ├── forms/       # RegisterForm, LoginForm, PaymentForm, MemberEditForm
 │   ├── dashboard/   # StatsCard, RevenueChart, MemberTable, PaymentStatusBadge,
 │   │                # AttendanceCalendar, ActivityFeed, CheckInButton, WeightChart
-│   └── charts/      # WorkoutChartCard, ChartViewer
-├── lib/             # db, auth, api helpers, stripe, payments, settings, validations, utils, constants
-├── models/          # User, Payment, Attendance, WorkoutChart, Settings
+│   └── workout/     # WorkoutPlanForm, ImportWhatsAppModal, PlanViewer, PlanPreview
+├── lib/             # db, auth, api helpers, stripe, payments, settings, validations, utils, constants,
+│                    # workoutPlan (WhatsApp parser/formatter)
+├── models/          # User, Payment, Attendance, MemberWorkoutPlan, Settings
 ├── hooks/           # useAuth, useFetch (SWR), useDebounce
 ├── store/           # Zustand UI store
 ├── types/           # shared TS types + next-auth augmentation
@@ -156,4 +165,4 @@ scripts/seed.ts      # admin + sample data
 - Middleware protects `/admin/*` (admins only) and `/member/*` (members only). Every API route also checks auth and role on the server.
 - JSON bodies are stripped of `$`-prefixed and dotted keys to prevent operator injection. All inputs are validated with Zod.
 - Comments mark where to add **rate limiting** (login, registration) before going to production.
-- Uploaded images (profile, chart) are compressed client-side and size-checked server-side. They are stored as data URLs in MongoDB. Move them to object storage (S3, Cloudinary) if you expect many large images.
+- Uploaded profile photos are compressed client-side and size-checked server-side. They are stored as data URLs in MongoDB. Move them to object storage (S3, Cloudinary) if you expect many large images.
