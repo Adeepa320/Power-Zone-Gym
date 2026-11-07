@@ -17,13 +17,15 @@ import {
   PencilLine,
   Plus,
   Save,
+  SeparatorHorizontal,
   Trash2,
   Users,
 } from 'lucide-react';
 import { z } from 'zod';
 import { workoutPlanSchema } from '@/lib/validations';
-import { COMMON_EXERCISES, DAY_TITLE_SUGGESTIONS, GYM } from '@/lib/constants';
+import { COMMON_EXERCISES, DAY_TITLE_SUGGESTIONS, GYM, MUSCLE_GROUPS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { normalizeExercises } from '@/lib/workoutPlan';
 import { apiRequest, fetcher, useFetch } from '@/hooks/useFetch';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea } from '@/components/ui/Input';
@@ -37,7 +39,16 @@ export interface PlanFormValues {
   planTitle: string;
   startDate: string;
   notes: string;
-  days: { dayNumber: number; dayTitle: string; exercises: { name: string; setsReps: string; notes: string }[] }[];
+  days: { dayNumber: number; dayTitle: string; exercises: FormRow[] }[];
+}
+
+/** One editor row: an exercise, or a divider separating muscle groups. */
+export interface FormRow {
+  name: string;
+  setsReps: string;
+  notes: string;
+  isGroupDivider: boolean;
+  groupTitle: string;
 }
 
 /**
@@ -54,37 +65,51 @@ const planFormSchema = workoutPlanSchema.extend({
         exercises: z
           .array(
             z
-              .object({ name: z.string().trim().max(120), setsReps: z.string().trim().max(60, 'Too long'), notes: z.string().trim().max(200) })
+              .object({
+                name: z.string().trim().max(120),
+                setsReps: z.string().trim().max(60, 'Too long'),
+                notes: z.string().trim().max(200),
+                isGroupDivider: z.boolean(),
+                groupTitle: z.string().trim().max(60, 'Too long'),
+              })
               .superRefine((e, ctx) => {
-                if (!e.name && (e.setsReps || e.notes)) ctx.addIssue({ code: 'custom', path: ['name'], message: 'Exercise name is required' });
+                if (!e.isGroupDivider && !e.name && (e.setsReps || e.notes)) ctx.addIssue({ code: 'custom', path: ['name'], message: 'Exercise name is required' });
               }),
           )
-          .refine((rows) => rows.some((r) => r.name.trim()), 'Add at least one exercise to this day'),
+          .refine((rows) => rows.some((r) => !r.isGroupDivider && r.name.trim()), 'Add at least one exercise to this day'),
       }),
     )
     .min(1, 'Add at least one day')
     .max(14, 'Maximum 14 days'),
 });
 
-const emptyExercise = () => ({ name: '', setsReps: '', notes: '' });
+const emptyExercise = (): FormRow => ({ name: '', setsReps: '', notes: '', isGroupDivider: false, groupTitle: '' });
+const emptyDivider = (groupTitle = ''): FormRow => ({ name: '', setsReps: '', notes: '', isGroupDivider: true, groupTitle });
+const isRealExercise = (e: FormRow) => !e.isGroupDivider && Boolean(e.name.trim());
 const emptyDay = (n: number) => ({ dayNumber: n, dayTitle: '', exercises: [emptyExercise(), emptyExercise(), emptyExercise()] });
 
 function toFormDays(days: PlanDay[]): PlanFormValues['days'] {
   return days.map((d, i) => ({
     dayNumber: i + 1,
     dayTitle: d.dayTitle ?? '',
-    exercises: d.exercises.map((e) => ({ name: e.name, setsReps: e.setsReps ?? '', notes: e.notes ?? '' })),
+    exercises: d.exercises.map((e) => ({
+      name: e.name ?? '',
+      setsReps: e.setsReps ?? '',
+      notes: e.notes ?? '',
+      isGroupDivider: Boolean(e.isGroupDivider),
+      groupTitle: e.groupTitle ?? '',
+    })),
   }));
 }
 
-/** Drop completely blank exercise rows before validation/saving. */
+/** Drop blank exercise rows and tidy dividers (no leading/trailing/double gaps) before saving. */
 function compact(values: PlanFormValues): PlanFormValues {
   return {
     ...values,
     days: values.days.map((d, i) => ({
       ...d,
       dayNumber: i + 1,
-      exercises: d.exercises.filter((e) => e.name.trim() || e.setsReps.trim() || e.notes.trim()),
+      exercises: normalizeExercises(d.exercises.filter((e) => e.isGroupDivider || e.name.trim() || e.setsReps.trim() || e.notes.trim())),
     })),
   };
 }
@@ -189,6 +214,11 @@ export function WorkoutPlanForm({
           <option key={e} value={e} />
         ))}
       </datalist>
+      <datalist id="group-title-suggestions">
+        {MUSCLE_GROUPS.map((g) => (
+          <option key={g} value={g} />
+        ))}
+      </datalist>
       <datalist id="day-title-suggestions">
         {DAY_TITLE_SUGGESTIONS.map((e) => (
           <option key={e} value={e} />
@@ -242,7 +272,7 @@ export function WorkoutPlanForm({
               Copy from another member
             </Button>
             <span className="ml-auto text-xs text-muted">
-              {values.days?.length ?? 0} days · {values.days?.reduce((n, d) => n + d.exercises.filter((e) => e.name.trim()).length, 0) ?? 0} exercises
+              {values.days?.length ?? 0} days · {values.days?.reduce((n, d) => n + d.exercises.filter(isRealExercise).length, 0) ?? 0} exercises
             </span>
           </div>
           {(errors.days?.message || errors.days?.root?.message) && <p className="text-sm text-danger">{errors.days?.message ?? errors.days?.root?.message}</p>}
@@ -267,7 +297,7 @@ export function WorkoutPlanForm({
                     setFocus={setFocus}
                     errors={errors}
                     title={values.days?.[index]?.dayTitle ?? ''}
-                    exerciseCount={values.days?.[index]?.exercises.filter((e) => e.name.trim()).length ?? 0}
+                    exerciseCount={values.days?.[index]?.exercises.filter(isRealExercise).length ?? 0}
                     onMoveUp={() => days.move(index, index - 1)}
                     onMoveDown={() => days.move(index, index + 1)}
                     onDuplicate={() => duplicateDay(index)}
@@ -303,7 +333,7 @@ export function WorkoutPlanForm({
                   startDate: values.startDate,
                   notes: values.notes,
                   memberName,
-                  days: compact(values as PlanFormValues).days.filter((d) => d.exercises.length > 0),
+                  days: compact(values as PlanFormValues).days.filter((d) => d.exercises.some((e) => !e.isGroupDivider)),
                 }}
               />
             </div>
@@ -334,7 +364,7 @@ export function WorkoutPlanForm({
       <ImportWhatsAppModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        hasExistingDays={(values.days ?? []).some((d) => d.exercises.some((e) => e.name.trim()))}
+        hasExistingDays={(values.days ?? []).some((d) => d.exercises.some(isRealExercise))}
         onImport={importDays}
       />
 
@@ -391,14 +421,20 @@ function DayEditor({
   const expanded = open || hasError;
   const color = dayColor(index);
 
-  /** Enter in the last field of a row → jump to the next row (adding one if needed). */
+  /** Enter in the last field of a row → jump to the next exercise row (adding one if needed). */
   function nextRow(row: number) {
-    if (row === exercises.fields.length - 1) {
-      exercises.append(emptyExercise(), { focusName: `days.${index}.exercises.${row + 1}.name` });
+    const next = exercises.fields.findIndex((f, i) => i > row && !f.isGroupDivider);
+    if (next === -1) {
+      exercises.append(emptyExercise(), { focusName: `days.${index}.exercises.${exercises.fields.length}.name` });
     } else {
-      setFocus(`days.${index}.exercises.${row + 1}.name`);
+      setFocus(`days.${index}.exercises.${next}.name`);
     }
   }
+
+  /** Display number for each exercise row — dividers don't count. */
+  let counter = 0;
+  const numbers = exercises.fields.map((f) => (f.isGroupDivider ? 0 : ++counter));
+  const realCount = exercises.fields.filter((f) => !f.isGroupDivider).length;
 
   return (
     <div className={cn('glass relative overflow-hidden rounded-2xl', hasError && 'border-danger/40')}>
@@ -441,71 +477,123 @@ function DayEditor({
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
             <div className="space-y-2 p-4">
               {/* Column labels (desktop) */}
-              <div className="hidden grid-cols-[24px_minmax(0,1fr)_130px_minmax(0,0.7fr)_64px] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted sm:grid">
+              <div className="hidden grid-cols-[24px_minmax(0,1fr)_130px_minmax(0,0.7fr)_96px] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted sm:grid">
                 <span />
                 <span>Exercise</span>
                 <span>Sets / Reps</span>
                 <span>Notes</span>
                 <span />
               </div>
-              {exercises.fields.map((field, row) => {
-                const exErr = dayErrors?.exercises?.[row];
-                return (
-                  <div key={field.id} className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-2 sm:grid-cols-[24px_minmax(0,1fr)_130px_minmax(0,0.7fr)_64px]">
-                    <span className="pt-2.5 text-center font-mono text-xs" style={{ color }}>
-                      {row + 1}
-                    </span>
-                    <div>
+              <AnimatePresence initial={false}>
+                {exercises.fields.map((field, row) => {
+                  const exErr = dayErrors?.exercises?.[row];
+                  const moveUp = (
+                    <IconBtn label="Move up" disabled={row === 0} onClick={() => exercises.move(row, row - 1)}>
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </IconBtn>
+                  );
+                  const moveDown = (
+                    <IconBtn label="Move down" disabled={row === exercises.fields.length - 1} onClick={() => exercises.move(row, row + 1)}>
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </IconBtn>
+                  );
+
+                  /* ---------- Divider row: gap between muscle groups ---------- */
+                  if (field.isGroupDivider) {
+                    return (
+                      <motion.div
+                        key={field.id}
+                        layout
+                        initial={{ opacity: 0, scaleX: 0.6 }}
+                        animate={{ opacity: 1, scaleX: 1 }}
+                        exit={{ opacity: 0, scaleX: 0.6 }}
+                        className="flex items-center gap-2 py-2"
+                      >
+                        <span className="h-px w-6 shrink-0 sm:w-8" style={{ background: `${color}88` }} />
+                        <SeparatorHorizontal className="h-4 w-4 shrink-0" style={{ color }} />
+                        <input
+                          {...register(`days.${index}.exercises.${row}.groupTitle`)}
+                          list="group-title-suggestions"
+                          placeholder="Muscle group (optional) — e.g. Biceps"
+                          className="h-8 min-w-0 flex-1 rounded-lg border border-dashed bg-transparent px-3 text-xs font-semibold uppercase tracking-wider placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-muted/60 focus:border-solid focus:outline-none"
+                          style={{ borderColor: `${color}66`, color }}
+                        />
+                        <span className="hidden h-px flex-1 border-t border-dashed sm:block" style={{ borderColor: `${color}55` }} />
+                        <div className="flex shrink-0">
+                          {moveUp}
+                          {moveDown}
+                          <IconBtn label="Remove divider" onClick={() => exercises.remove(row)} danger>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </IconBtn>
+                        </div>
+                      </motion.div>
+                    );
+                  }
+
+                  /* ---------- Exercise row ---------- */
+                  return (
+                    <motion.div
+                      key={field.id}
+                      layout
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-2 sm:grid-cols-[24px_minmax(0,1fr)_130px_minmax(0,0.7fr)_96px]"
+                    >
+                      <span className="pt-2.5 text-center font-mono text-xs" style={{ color }}>
+                        {numbers[row]}
+                      </span>
+                      <div>
+                        <input
+                          {...register(`days.${index}.exercises.${row}.name`)}
+                          list="exercise-suggestions"
+                          placeholder="Exercise name"
+                          className={cn(rowInput, exErr?.name && 'border-danger/60')}
+                        />
+                        {exErr?.name && <p className="mt-1 text-[11px] text-danger">{exErr.name.message}</p>}
+                      </div>
+                      <div className="flex sm:hidden">
+                        <IconBtn label="Remove exercise" disabled={realCount === 1} onClick={() => exercises.remove(row)} danger>
+                          <Trash2 className="h-4 w-4" />
+                        </IconBtn>
+                      </div>
                       <input
-                        {...register(`days.${index}.exercises.${row}.name`)}
-                        list="exercise-suggestions"
-                        placeholder="Exercise name"
-                        className={cn(rowInput, exErr?.name && 'border-danger/60')}
+                        {...register(`days.${index}.exercises.${row}.setsReps`)}
+                        placeholder="12 10 8"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            nextRow(row);
+                          }
+                        }}
+                        className={cn(rowInput, 'col-start-2 font-mono sm:col-start-auto')}
                       />
-                      {exErr?.name && <p className="mt-1 text-[11px] text-danger">{exErr.name.message}</p>}
-                    </div>
-                    <div className="flex sm:hidden">
-                      <IconBtn label="Remove exercise" disabled={exercises.fields.length === 1} onClick={() => exercises.remove(row)} danger>
-                        <Trash2 className="h-4 w-4" />
-                      </IconBtn>
-                    </div>
-                    <input
-                      {...register(`days.${index}.exercises.${row}.setsReps`)}
-                      placeholder="12 10 8"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          nextRow(row);
-                        }
-                      }}
-                      className={cn(rowInput, 'col-start-2 font-mono sm:col-start-auto')}
-                    />
-                    <input
-                      {...register(`days.${index}.exercises.${row}.notes`)}
-                      placeholder="Machine, slow negatives…"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          nextRow(row);
-                        }
-                      }}
-                      className={cn(rowInput, 'col-start-2 sm:col-start-auto')}
-                    />
-                    <div className="hidden sm:flex">
-                      <IconBtn label="Move exercise up" disabled={row === 0} onClick={() => exercises.move(row, row - 1)}>
-                        <ArrowUp className="h-3.5 w-3.5" />
-                      </IconBtn>
-                      <IconBtn label="Remove exercise" disabled={exercises.fields.length === 1} onClick={() => exercises.remove(row)} danger>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </IconBtn>
-                    </div>
-                  </div>
-                );
-              })}
+                      <input
+                        {...register(`days.${index}.exercises.${row}.notes`)}
+                        placeholder="Machine, slow negatives…"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            nextRow(row);
+                          }
+                        }}
+                        className={cn(rowInput, 'col-start-2 sm:col-start-auto')}
+                      />
+                      <div className="hidden sm:flex">
+                        {moveUp}
+                        {moveDown}
+                        <IconBtn label="Remove exercise" disabled={realCount === 1} onClick={() => exercises.remove(row)} danger>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </IconBtn>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
               {(dayErrors?.exercises?.message || dayErrors?.exercises?.root?.message) && (
                 <p className="text-xs text-danger">{dayErrors.exercises.message ?? dayErrors.exercises.root?.message}</p>
               )}
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex flex-wrap items-center gap-1 pt-1">
                 <button
                   type="button"
                   onClick={() => exercises.append(emptyExercise(), { focusName: `days.${index}.exercises.${exercises.fields.length}.name` })}
@@ -513,7 +601,15 @@ function DayEditor({
                 >
                   <Plus className="h-4 w-4" /> Add exercise
                 </button>
-                <span className="hidden text-[11px] text-muted/70 sm:block">Press Enter in Sets / Notes to jump to the next row</span>
+                <button
+                  type="button"
+                  onClick={() => exercises.append(emptyDivider(), { focusName: `days.${index}.exercises.${exercises.fields.length}.groupTitle` })}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted transition hover:bg-white/5 hover:text-white"
+                  title="Separate muscle groups, e.g. chest exercises → biceps exercises"
+                >
+                  <SeparatorHorizontal className="h-4 w-4" /> Add divider / space
+                </button>
+                <span className="ml-auto hidden text-[11px] text-muted/70 md:block">Enter in Sets / Notes → next row</span>
               </div>
             </div>
           </motion.div>

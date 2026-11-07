@@ -81,6 +81,8 @@ Incline (D/b press 10 8 8)
 Bench press (m) 12 10 8
 Cable flyes 10-3
 Decline bench 8 10 12
+
+Biceps:
 Z bar curl 10-2 8-2
 D/b curl 10 8 6
 Cable curl 8-4
@@ -93,6 +95,7 @@ Bent over lateral 12-2 10-2
 Face pull 10-3
 D/b front raise 12-3
 Cable one arm front raise 10-3
+
 Back side lateral 12-3 (D/b side lateral 10-3)
 
 3 day - Back & Triceps
@@ -100,6 +103,8 @@ Lat pulldown 12 10 8
 Seated cable row 12 10 8
 One arm D/b row 10-3
 Deadlift 8 6 6 (Keep back neutral)
+
+Triceps:
 Triceps pushdown 12-3
 Overhead extension 10-3
 Dips till failure
@@ -110,6 +115,8 @@ Leg press 12-3
 Leg extension 15-3
 Leg curl 12-3
 Standing calf raise 20-4
+
+Abs:
 Hanging leg raise 15-3
 Plank 1 min-3`,
   },
@@ -123,6 +130,8 @@ D/b shoulder press 12-3
 Seated cable row 12-3
 Cable curl 15-3
 Triceps pushdown 15-3
+
+Cardio:
 Treadmill incline walk 20 min
 
 2 day - Lower Body & Core
@@ -132,6 +141,7 @@ Walking lunges 12-3 (each leg)
 Leg curl 15-3
 Crunches 20-3
 Russian twist 20-3
+
 Cycling 20 min
 
 3 day - Full Body Circuit

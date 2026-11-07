@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeExercises } from './workoutPlan';
 
 /**
  * Zod schemas shared by the client forms and API route handlers,
@@ -126,16 +127,28 @@ export const checkoutSchema = z.object({
 
 // ---------- Workout plans (per member) ----------
 
-export const planExerciseSchema = z.object({
-  name: trimmed(1, 'Exercise name is required', 120),
-  setsReps: z.string().trim().max(60, 'Too long').optional().default(''),
-  notes: z.string().trim().max(200).optional().default(''),
-});
+export const planExerciseSchema = z
+  .object({
+    name: z.string().trim().max(120, 'Must be at most 120 characters').optional().default(''),
+    setsReps: z.string().trim().max(60, 'Too long').optional().default(''),
+    notes: z.string().trim().max(200).optional().default(''),
+    /** Divider row between muscle groups within a day. */
+    isGroupDivider: z.boolean().optional().default(false),
+    groupTitle: z.string().trim().max(60).optional().default(''),
+  })
+  .superRefine((e, ctx) => {
+    if (!e.isGroupDivider && !e.name) ctx.addIssue({ code: 'custom', path: ['name'], message: 'Exercise name is required' });
+  });
 
 export const planDaySchema = z.object({
   dayNumber: z.coerce.number().int().min(1).max(14),
   dayTitle: z.string().trim().max(80).optional().default(''),
-  exercises: z.array(planExerciseSchema).min(1, 'Add at least one exercise to every day').max(40),
+  exercises: z
+    .array(planExerciseSchema)
+    .max(60)
+    // Drop leading/trailing/double dividers so spacing is always clean.
+    .transform((rows) => normalizeExercises(rows))
+    .refine((rows) => rows.some((r) => !r.isGroupDivider), 'Add at least one exercise to every day'),
 });
 
 export const workoutPlanSchema = z.object({

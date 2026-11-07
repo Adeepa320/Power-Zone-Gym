@@ -7,6 +7,12 @@ import type { PlanDay, PlanExercise } from '@/types';
 /** Day headings trainers use: "1 day", "Day 2", "3rd day - Legs", "DAY 4: Back & Biceps". */
 const DAY_HEADING = /^(?:day\s*(\d{1,2})|(\d{1,2})\s*(?:st|nd|rd|th)?\s*day)\b\s*[:\-–—.)]?\s*(.*)$/i;
 
+/**
+ * Muscle-group label lines inside a day: "Biceps:", "-- Triceps --", "== Back ==", "[Chest]".
+ * Must contain no digits so "Plank 30 sec:" isn't mistaken for a label.
+ */
+const GROUP_LABEL = /^(?:[-=]{2,}\s*([^\d]{2,40}?)\s*[-=]{2,}|\[\s*([^\d\]]{2,40})\s*\]|([^\d:]{2,40}):)$/;
+
 /** WhatsApp "copy message" / chat-export prefixes: "[18:30, 06/11/2026] Sachin Gym: " or "06/11/2026, 18:30 - Sachin Gym: " */
 const WHATSAPP_PREFIX = /^\s*(?:\[[^\]]{4,40}\]\s*[^:]{1,40}:\s*|\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}(?:\s?[ap]m)?\s+-\s+[^:]{1,40}:\s*)/i;
 
@@ -14,7 +20,7 @@ const WHATSAPP_PREFIX = /^\s*(?:\[[^\]]{4,40}\]\s*[^:]{1,40}:\s*|\d{1,2}\/\d{1,2
 function clean(line: string) {
   return line
     .replace(WHATSAPP_PREFIX, '')
-    .replace(/[*_~]/g, '')
+    .replace(/[*_~]/g, '') // WhatsApp bold / italic / strikethrough
     .replace(/^\s*(?:[-•▪●◦>]|\d{1,2}[.)])\s+/, '') // bullets / "1." numbering
     .replace(/\s+/g, ' ')
     .trim();
@@ -24,6 +30,39 @@ function balance(name: string) {
   const open = (name.match(/\(/g) ?? []).length;
   const close = (name.match(/\)/g) ?? []).length;
   return open - close;
+}
+
+export const isDivider = (e: Pick<PlanExercise, 'isGroupDivider'>) => Boolean(e.isGroupDivider);
+
+export function divider(groupTitle = ''): PlanExercise {
+  return { name: '', setsReps: '', notes: '', isGroupDivider: true, groupTitle };
+}
+
+/**
+ * Tidy divider rows: no divider before the first exercise or after the last one,
+ * and consecutive dividers collapse into one (keeping a label if any has one).
+ */
+export function normalizeExercises<T extends Pick<PlanExercise, 'isGroupDivider' | 'groupTitle'>>(rows: T[]): T[] {
+  const out: T[] = [];
+  for (const row of rows) {
+    if (!row.isGroupDivider) {
+      out.push(row);
+      continue;
+    }
+    if (out.length === 0) {
+      // Leading divider with a label is still useful as the first group's heading.
+      if (row.groupTitle?.trim()) out.push(row);
+      continue;
+    }
+    const last = out[out.length - 1];
+    if (last.isGroupDivider) {
+      if (!last.groupTitle?.trim() && row.groupTitle?.trim()) out[out.length - 1] = row;
+      continue;
+    }
+    out.push(row);
+  }
+  while (out.length && out[out.length - 1].isGroupDivider) out.pop();
+  return out;
 }
 
 /**
@@ -65,38 +104,79 @@ export function parseExerciseLine(raw: string): PlanExercise | null {
 
 /**
  * Parse a WhatsApp-style routine into days.
- * Lines before the first "N day" heading go into Day 1.
+ *  - "1 day" / "Day 2 - Legs" start a new day (lines before the first heading go into Day 1)
+ *  - a blank line between exercises becomes a divider (muscle-group gap)
+ *  - "Biceps:" / "-- Triceps --" / "[Back]" become a labelled divider
  */
 export function parseWhatsAppPlan(text: string): PlanDay[] {
   const days: PlanDay[] = [];
   let current: PlanDay | null = null;
+  let pendingGap = false;
 
-  for (const raw of text.split(/\r?\n/)) {
+  const ensureDay = () => {
+    if (!current) {
+      current = { dayNumber: 1, dayTitle: '', exercises: [] };
+      days.push(current);
+    }
+    return current;
+  };
+
+  const rawLines = text.split(/\r?\n/);
+  // If the text has day headings, anything before the first one is a header
+  // (gym name, plan title, "Member: …") — e.g. when re-importing a message this app sent.
+  const firstHeading = rawLines.findIndex((l) => DAY_HEADING.test(clean(l)));
+
+  for (const [i, raw] of rawLines.entries()) {
+    if (firstHeading > 0 && i < firstHeading) continue;
+    const unprefixed = raw.replace(WHATSAPP_PREFIX, '').trim();
+    if (/^(📝|member:)/i.test(unprefixed)) continue; // footer notes / member line from formatPlanForWhatsApp
+
     const line = clean(raw);
-    if (!line) continue;
+    if (!line) {
+      pendingGap = true;
+      continue;
+    }
+
+    // "_Biceps_" — an italic label line, as written by formatPlanForWhatsApp.
+    const italic = /^_([^_\d]{2,40})_$/.exec(unprefixed);
+    if (italic) {
+      ensureDay().exercises.push(divider(italic[1].trim()));
+      pendingGap = false;
+      continue;
+    }
 
     const heading = DAY_HEADING.exec(line);
     if (heading) {
       const num = Number(heading[1] ?? heading[2]);
       current = { dayNumber: num || days.length + 1, dayTitle: (heading[3] ?? '').trim(), exercises: [] };
       days.push(current);
+      pendingGap = false;
+      continue;
+    }
+
+    const label = GROUP_LABEL.exec(line);
+    if (label) {
+      ensureDay().exercises.push(divider((label[1] ?? label[2] ?? label[3] ?? '').trim()));
+      pendingGap = false;
       continue;
     }
 
     const exercise = parseExerciseLine(line);
     if (!exercise) continue;
-    if (!current) {
-      current = { dayNumber: 1, dayTitle: '', exercises: [] };
-      days.push(current);
-    }
-    current.exercises.push(exercise);
+    const day = ensureDay();
+    if (pendingGap && day.exercises.length > 0) day.exercises.push(divider());
+    pendingGap = false;
+    day.exercises.push(exercise);
   }
 
-  // Renumber sequentially (handles duplicate/missing numbers) and drop empty days.
-  return days.filter((d) => d.exercises.length > 0).map((d, i) => ({ ...d, dayNumber: i + 1 }));
+  // Renumber sequentially, tidy dividers, and drop days without exercises.
+  return days
+    .map((d) => ({ ...d, exercises: normalizeExercises(d.exercises) }))
+    .filter((d) => d.exercises.some((e) => !isDivider(e)))
+    .map((d, i) => ({ ...d, dayNumber: i + 1 }));
 }
 
-/** Format a plan as a WhatsApp message (uses *bold* markup). */
+/** Format a plan as a WhatsApp message (uses *bold* / _italic_ markup). */
 export function formatPlanForWhatsApp(plan: {
   gymName: string;
   planTitle: string;
@@ -109,6 +189,11 @@ export function formatPlanForWhatsApp(plan: {
   for (const day of plan.days) {
     lines.push('', `*${day.dayNumber} day${day.dayTitle ? ` – ${day.dayTitle}` : ''}*`);
     for (const ex of day.exercises) {
+      if (isDivider(ex)) {
+        lines.push('');
+        if (ex.groupTitle) lines.push(`_${ex.groupTitle}_`);
+        continue;
+      }
       let line = ex.name;
       if (ex.setsReps) line += ` ${ex.setsReps}`;
       if (ex.notes) line += ` (${ex.notes})`;
@@ -126,9 +211,32 @@ export function whatsappLink(phone: string | undefined, text: string) {
   return `${base}?text=${encodeURIComponent(text)}`;
 }
 
+/** Exercises only (dividers excluded). */
+export function realExercises<T extends Pick<PlanExercise, 'isGroupDivider'>>(rows: T[]): T[] {
+  return rows.filter((r) => !r.isGroupDivider);
+}
+
+/**
+ * Split a day's rows into muscle groups for rendering:
+ * [{ title, exercises: [{ exercise, number }] }] — numbering runs continuously across groups.
+ */
+export function groupExercises(rows: PlanExercise[]) {
+  const groups: { title: string; items: { exercise: PlanExercise; number: number }[] }[] = [];
+  let n = 0;
+  for (const row of rows) {
+    if (isDivider(row)) {
+      groups.push({ title: row.groupTitle ?? '', items: [] });
+      continue;
+    }
+    if (groups.length === 0) groups.push({ title: '', items: [] });
+    groups[groups.length - 1].items.push({ exercise: row, number: ++n });
+  }
+  return groups.filter((g) => g.items.length > 0);
+}
+
 export function planStats(days: PlanDay[]) {
   return {
     dayCount: days.length,
-    exerciseCount: days.reduce((n, d) => n + d.exercises.length, 0),
+    exerciseCount: days.reduce((n, d) => n + realExercises(d.exercises).length, 0),
   };
 }

@@ -44,7 +44,7 @@ export function ImportWhatsAppModal({
   const [text, setText] = useState('');
   const [mode, setMode] = useState<'replace' | 'append'>('replace');
   const parsed = useMemo(() => parseWhatsAppPlan(text), [text]);
-  const exerciseCount = parsed.reduce((n, d) => n + d.exercises.length, 0);
+  const exerciseCount = parsed.reduce((n, d) => n + d.exercises.filter((e) => !e.isGroupDivider).length, 0);
 
   async function paste() {
     try {
@@ -133,7 +133,13 @@ export function ImportWhatsAppModal({
                     {d.dayTitle && <span className="ml-2 font-semibold text-white">{d.dayTitle}</span>}
                   </p>
                   <ul className="space-y-1 text-sm">
-                    {d.exercises.map((ex, j) => (
+                    {d.exercises.map((ex, j) =>
+                      ex.isGroupDivider ? (
+                        <li key={j} className="flex items-center gap-2 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted">
+                          {ex.groupTitle || 'gap'}
+                          <span className="h-px flex-1 border-t border-dashed border-white/15" />
+                        </li>
+                      ) : (
                       <li key={j} className="flex items-baseline justify-between gap-3">
                         <span className="truncate">
                           {ex.name}
@@ -141,13 +147,14 @@ export function ImportWhatsAppModal({
                         </span>
                         <span className="shrink-0 font-mono text-xs text-primary">{ex.setsReps || '—'}</span>
                       </li>
-                    ))}
+                      ),
+                    )}
                   </ul>
                 </motion.div>
               ))
             )}
           </div>
-          <p className="mt-2 text-xs text-muted">Tip: day titles like &quot;Chest &amp; Biceps&quot; can be added after importing.</p>
+          <p className="mt-2 text-xs text-muted">A blank line (or a line like &quot;Biceps:&quot;) between exercises becomes a muscle-group divider.</p>
         </div>
       </div>
     </Modal>

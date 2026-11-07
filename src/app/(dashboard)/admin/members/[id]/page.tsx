@@ -280,7 +280,7 @@ export default function MemberDetailPage() {
                         DAY {d.dayNumber}
                         {d.dayTitle && <span className="ml-1.5 font-semibold text-white">{d.dayTitle}</span>}
                       </p>
-                      <p className="mt-1 line-clamp-2 text-xs text-muted">{d.exercises.map((e) => e.name).join(' · ')}</p>
+                      <p className="mt-1 line-clamp-2 text-xs text-muted">{d.exercises.filter((e) => !e.isGroupDivider).map((e) => e.name).join(' · ')}</p>
                     </div>
                   ))}
                 </div>

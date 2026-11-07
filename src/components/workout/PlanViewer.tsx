@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CalendarDays, Dumbbell, LayoutList, MessageSquareText, NotebookPen, Rows3, UserRound } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
-import type { PlanDay } from '@/types';
+import { groupExercises, realExercises } from '@/lib/workoutPlan';
+import type { PlanDay, PlanExercise } from '@/types';
 
 /** Colour per day so members can recognise "their" day at a glance. */
 export const DAY_COLORS = ['#00d4ff', '#00ff88', '#ffaa00', '#8b5cf6', '#ff6b35', '#ff4fa3', '#38bdf8'];
@@ -30,7 +31,7 @@ export function PlanViewer({ plan, compact = false }: { plan: PlanViewData; comp
   const [showAll, setShowAll] = useState(false);
   const days = plan.days ?? [];
   const day = days[Math.min(active, Math.max(days.length - 1, 0))];
-  const totalExercises = days.reduce((n, d) => n + d.exercises.length, 0);
+  const totalExercises = days.reduce((n, d) => n + realExercises(d.exercises).length, 0);
 
   return (
     <>
@@ -97,7 +98,7 @@ export function PlanViewer({ plan, compact = false }: { plan: PlanViewData; comp
                         <motion.span layoutId={compact ? 'day-pill-c' : 'day-pill'} className="absolute inset-0 rounded-xl" style={{ background: dayColor(i) }} />
                       )}
                       <span className="relative block text-[10px] font-bold uppercase tracking-wider">Day {d.dayNumber}</span>
-                      <span className="relative block max-w-[160px] truncate text-sm font-semibold">{d.dayTitle || `${d.exercises.length} exercises`}</span>
+                      <span className="relative block max-w-[160px] truncate text-sm font-semibold">{d.dayTitle || `${realExercises(d.exercises).length} exercises`}</span>
                     </button>
                   );
                 })}
@@ -149,19 +150,28 @@ export function PlanViewer({ plan, compact = false }: { plan: PlanViewData; comp
                 Day {d.dayNumber}
                 {d.dayTitle && ` – ${d.dayTitle}`}
               </p>
-              <table className="mt-2 w-full text-sm">
-                <tbody>
-                  {d.exercises.map((ex, i) => (
-                    <tr key={ex._id ?? i} className="border-t border-gray-300">
-                      <td className="py-1 pr-2">
-                        {ex.name}
-                        {ex.notes && <span className="block text-xs italic">{ex.notes}</span>}
-                      </td>
-                      <td className="whitespace-nowrap py-1 text-right font-semibold">{ex.setsReps}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {groupExercises(d.exercises).map((group, gi) => (
+                <div key={gi} className={gi > 0 ? 'mt-4' : 'mt-2'}>
+                  {group.title ? (
+                    <p className="border-b-2 border-black pb-0.5 text-xs font-bold uppercase tracking-wider">{group.title}</p>
+                  ) : (
+                    gi > 0 && <div className="border-t-2 border-dashed border-gray-400" />
+                  )}
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {group.items.map(({ exercise: ex }, i) => (
+                        <tr key={ex._id ?? i} className={i > 0 || group.title ? 'border-t border-gray-300' : ''}>
+                          <td className="py-1 pr-2">
+                            {ex.name}
+                            {ex.notes && <span className="block text-xs italic">{ex.notes}</span>}
+                          </td>
+                          <td className="whitespace-nowrap py-1 text-right font-semibold">{ex.setsReps}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -183,36 +193,57 @@ function DayBlock({ day, index, showHeading }: { day: PlanDay; index: number; sh
         </div>
       )}
       {!showHeading && day.dayTitle && <h3 className="mb-3 text-lg font-semibold">{day.dayTitle}</h3>}
-      <ol className="space-y-2">
-        {day.exercises.map((ex, i) => (
-          <motion.li
-            key={ex._id ?? `${ex.name}-${i}`}
-            initial={{ opacity: 0, x: -14 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: Math.min(i * 0.04, 0.4) }}
-            className="glass flex items-center gap-4 rounded-xl px-4 py-3"
-          >
-            <span className="w-6 shrink-0 text-center font-mono text-xs font-bold" style={{ color }}>
-              {String(i + 1).padStart(2, '0')}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">{ex.name}</p>
-              {ex.notes && (
-                <p className="mt-0.5 flex items-start gap-1.5 text-xs text-muted">
-                  <MessageSquareText className="mt-0.5 h-3 w-3 shrink-0 text-warning" />
-                  {ex.notes}
-                </p>
-              )}
-            </div>
-            {ex.setsReps && (
-              <span className="shrink-0 rounded-lg border px-3 py-1.5 font-mono text-sm font-semibold" style={{ borderColor: `${color}55`, background: `${color}14`, color }}>
-                {ex.setsReps}
-              </span>
+      <div className="space-y-6">
+        {groupExercises(day.exercises).map((group, gi) => (
+          <div key={gi}>
+            {(group.title || gi > 0) && (
+              <div className="mb-2.5 flex items-center gap-3">
+                {group.title && (
+                  <span className="shrink-0 text-xs font-bold uppercase tracking-[0.15em]" style={{ color }}>
+                    {group.title}
+                  </span>
+                )}
+                <span className="h-px flex-1" style={{ background: `linear-gradient(90deg, ${color}66, transparent)` }} />
+              </div>
             )}
-          </motion.li>
+            <ol className="space-y-2">
+              {group.items.map(({ exercise: ex, number }) => (
+                <ExerciseRow key={ex._id ?? `${ex.name}-${number}`} ex={ex} number={number} color={color} />
+              ))}
+            </ol>
+          </div>
         ))}
-      </ol>
+      </div>
     </div>
+  );
+}
+
+function ExerciseRow({ ex, number, color }: { ex: PlanExercise; number: number; color: string }) {
+  return (
+    <motion.li
+      initial={{ opacity: 0, x: -14 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: Math.min(number * 0.04, 0.4) }}
+      className="glass flex items-center gap-4 rounded-xl px-4 py-3"
+    >
+      <span className="w-6 shrink-0 text-center font-mono text-xs font-bold" style={{ color }}>
+        {String(number).padStart(2, '0')}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">{ex.name}</p>
+        {ex.notes && (
+          <p className="mt-0.5 flex items-start gap-1.5 text-xs text-muted">
+            <MessageSquareText className="mt-0.5 h-3 w-3 shrink-0 text-warning" />
+            {ex.notes}
+          </p>
+        )}
+      </div>
+      {ex.setsReps && (
+        <span className="shrink-0 rounded-lg border px-3 py-1.5 font-mono text-sm font-semibold" style={{ borderColor: `${color}55`, background: `${color}14`, color }}>
+          {ex.setsReps}
+        </span>
+      )}
+    </motion.li>
   );
 }
 

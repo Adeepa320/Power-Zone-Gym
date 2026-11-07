@@ -123,6 +123,9 @@ export const DAY_TITLE_SUGGESTIONS = [
   'Pull',
 ] as const;
 
+/** Suggestions for divider labels that separate muscle groups inside a day. */
+export const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Traps', 'Biceps', 'Triceps', 'Forearms', 'Legs', 'Calves', 'Abs', 'Core', 'Cardio', 'Warm-up', 'Stretching'] as const;
+
 export const COMMON_EXERCISES = [
   'Bench Press',
   'Bench Press (Machine)',

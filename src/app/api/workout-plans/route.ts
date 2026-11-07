@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       .lean();
 
     const plans = await MemberWorkoutPlan.find({ member: { $in: members.map((m) => m._id) } })
-      .select('member planTitle days.dayTitle days.exercises.name updatedAt')
+      .select('member planTitle days.dayTitle days.exercises.name days.exercises.isGroupDivider updatedAt')
       .lean();
     const byMember = new Map(plans.map((p) => [p.member.toString(), p]));
 
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
               _id: p._id,
               planTitle: p.planTitle,
               dayCount: p.days.length,
-              exerciseCount: p.days.reduce((n, d) => n + d.exercises.length, 0),
+              exerciseCount: p.days.reduce((n, d) => n + d.exercises.filter((e) => !e.isGroupDivider).length, 0),
               dayTitles: p.days.map((d) => d.dayTitle ?? ''),
               updatedAt: p.updatedAt,
             }

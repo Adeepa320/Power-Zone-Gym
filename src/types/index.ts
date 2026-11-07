@@ -25,6 +25,10 @@ export interface PlanExercise {
   /** Free-form: "12 10 8", "4 x 12", "10-3", "Till failure". */
   setsReps: string;
   notes?: string;
+  /** Divider row separating muscle groups within a day (name/setsReps unused). */
+  isGroupDivider?: boolean;
+  /** Optional muscle-group label on a divider, e.g. "Biceps". */
+  groupTitle?: string;
 }
 
 export interface PlanDay {
