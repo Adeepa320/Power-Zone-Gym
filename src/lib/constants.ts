@@ -7,6 +7,7 @@ export const GYM = {
   address: '42 Iron Street, Colombo 03',
   phone: '+94 77 123 4567',
   email: 'hello@powerzonegym.com',
+  instagram: '@powerzonegym',
   hours: [
     { days: 'Mon – Fri', time: '5:00 AM – 10:00 PM' },
     { days: 'Saturday', time: '6:00 AM – 8:00 PM' },

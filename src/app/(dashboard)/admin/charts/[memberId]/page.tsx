@@ -142,7 +142,14 @@ export default function MemberPlanEditorPage() {
       {/* Printable version of the saved plan */}
       {plan && (
         <div className="hidden print:block">
-          <PlanViewer plan={{ ...plan, memberName: member.name }} />
+          <PlanViewer
+            plan={{
+              ...plan,
+              memberName: member.name,
+              memberGoal: member.fitnessGoal,
+              trainerName: typeof plan.updatedBy === 'object' ? plan.updatedBy?.name : undefined,
+            }}
+          />
         </div>
       )}
 

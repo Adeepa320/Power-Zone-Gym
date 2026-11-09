@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { CalendarDays, Dumbbell, LayoutList, MessageSquareText, NotebookPen, Rows3, UserRound } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import { groupExercises, realExercises } from '@/lib/workoutPlan';
+import { PrintableWorkoutSheet } from './PrintableWorkoutSheet';
 import type { PlanDay, PlanExercise } from '@/types';
 
 /** Colour per day so members can recognise "their" day at a glance. */
@@ -20,11 +21,13 @@ export interface PlanViewData {
   updatedAt?: string;
   trainerName?: string;
   memberName?: string;
+  /** Member's fitness goal, shown on the printed sheet. */
+  memberGoal?: string;
 }
 
 /**
  * Organised day-by-day display of a member's personal workout plan.
- * Includes a plain, ink-friendly layout that is used when printing.
+ * When printing, the branded PrintableWorkoutSheet is shown instead.
  */
 export function PlanViewer({ plan, compact = false }: { plan: PlanViewData; compact?: boolean }) {
   const [active, setActive] = useState(0);
@@ -133,48 +136,9 @@ export function PlanViewer({ plan, compact = false }: { plan: PlanViewData; comp
         )}
       </div>
 
-      {/* ---------- Print view (plain, ink-friendly) ---------- */}
-      <div className="hidden text-black print:block">
-        <h1 className="text-2xl font-bold">{plan.gymName}</h1>
-        <h2 className="text-lg font-semibold">{plan.planTitle}</h2>
-        <p className="mt-1 text-sm">
-          {plan.memberName && <>Member: {plan.memberName} · </>}
-          {plan.startDate && <>From {formatDate(plan.startDate)} · </>}
-          {days.length} days
-        </p>
-        {plan.notes && <p className="mt-3 whitespace-pre-line border-l-4 border-black pl-3 text-sm">{plan.notes}</p>}
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          {days.map((d) => (
-            <div key={d._id ?? d.dayNumber} className="break-inside-avoid border border-black p-3">
-              <p className="font-bold">
-                Day {d.dayNumber}
-                {d.dayTitle && ` – ${d.dayTitle}`}
-              </p>
-              {groupExercises(d.exercises).map((group, gi) => (
-                <div key={gi} className={gi > 0 ? 'mt-4' : 'mt-2'}>
-                  {group.title ? (
-                    <p className="border-b-2 border-black pb-0.5 text-xs font-bold uppercase tracking-wider">{group.title}</p>
-                  ) : (
-                    gi > 0 && <div className="border-t-2 border-dashed border-gray-400" />
-                  )}
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {group.items.map(({ exercise: ex }, i) => (
-                        <tr key={ex._id ?? i} className={i > 0 || group.title ? 'border-t border-gray-300' : ''}>
-                          <td className="py-1 pr-2">
-                            {ex.name}
-                            {ex.notes && <span className="block text-xs italic">{ex.notes}</span>}
-                          </td>
-                          <td className="whitespace-nowrap py-1 text-right font-semibold">{ex.setsReps}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+      {/* ---------- Print view: branded, ink-friendly workout sheet ---------- */}
+      <div className="hidden print:block">
+        <PrintableWorkoutSheet plan={plan} />
       </div>
     </>
   );

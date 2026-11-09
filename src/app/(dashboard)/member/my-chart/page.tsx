@@ -20,6 +20,7 @@ export default function MyWorkoutPlanPage() {
   });
 
   const trainerName = plan && typeof plan.updatedBy === 'object' ? plan.updatedBy?.name : undefined;
+  const memberGoal = plan && typeof plan.member === 'object' ? (plan.member as { fitnessGoal?: string }).fitnessGoal : undefined;
 
   return (
     <>
@@ -52,7 +53,7 @@ export default function MyWorkoutPlanPage() {
           ))}
         </div>
       ) : plan ? (
-        <PlanViewer plan={{ ...plan, trainerName, memberName: user?.name ?? undefined }} />
+        <PlanViewer plan={{ ...plan, trainerName, memberGoal, memberName: user?.name ?? undefined }} />
       ) : (
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass relative overflow-hidden rounded-3xl px-6 py-20 text-center">
           <div className="absolute inset-0 bg-grid-pattern bg-grid opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />

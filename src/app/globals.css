@@ -77,15 +77,31 @@
   }
 }
 
-/* Printing a workout plan: plain white page, no dashboard chrome */
+/* Printing a workout plan: white A4 page, no dashboard chrome */
 @media print {
+  /* Keep badges, accent bars and light fills — browsers strip backgrounds by default */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html,
   body {
     background: #fff !important;
     background-image: none !important;
     color: #000;
+    min-height: 0 !important;
   }
+  /* Zero page margin hides the browser's URL/date header & footer; the sheet has its own padding */
   @page {
-    margin: 12mm;
+    size: A4 portrait;
+    margin: 0;
+  }
+  /* Day cards, trainer advice and footer never split across pages */
+  .print-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }
 

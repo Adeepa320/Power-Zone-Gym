@@ -54,7 +54,7 @@ export function DashboardShell({ sidebar, children }: { sidebar: ReactNode; chil
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="relative mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
+              className="relative mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 print:max-w-none print:p-0"
             >
               {children}
             </motion.div>
